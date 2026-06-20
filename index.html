@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hierarchy Builder</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
+  background:#f8f8f6;overflow:hidden;height:100vh;width:100vw;user-select:none;
+}
+
+/* TOP BAR */
+#topbar{
+  position:fixed;top:0;right:0;z-index:300;
+  display:flex;align-items:center;gap:16px;padding:14px 20px;
+}
+#nav-label .mode{font-size:10px;color:#9ba3af;letter-spacing:.08em;text-transform:uppercase;}
+#nav-label .type{font-size:14px;font-weight:700;color:#1a1a2e;}
+#save-btn{
+  display:flex;align-items:center;gap:7px;
+  background:#1a1a2e;color:#fff;border:none;border-radius:10px;
+  padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;
+  box-shadow:0 2px 8px rgba(26,26,46,.2);
+}
+#save-btn:hover{background:#2d2d4e;}
+#save-btn svg{width:15px;height:15px;flex-shrink:0;}
+
+/* LEFT PANEL */
+#left-panel{
+  position:fixed;top:0;left:0;width:240px;height:100vh;
+  z-index:200;pointer-events:none;
+}
+.lp-block{
+  position:absolute;left:16px;width:196px;
+  background:#fff;border:1.5px solid #e0e0da;border-radius:14px;
+  padding:13px 14px 11px 14px;
+  pointer-events:none;
+  display:flex;flex-direction:column;gap:3px;
+}
+.lp-block.d0{pointer-events:all;cursor:pointer;}
+.lp-block.d0:hover{box-shadow:0 2px 12px rgba(0,0,0,.07);}
+
+.lp-pill{
+  display:inline-block;background:#f0f0ec;border-radius:6px;
+  padding:2px 8px;font-size:9px;font-weight:700;
+  letter-spacing:.09em;text-transform:uppercase;color:#1a1a2e;
+  width:fit-content;
+}
+.lp-depth{
+  font-size:9.5px;color:#9ba3af;
+  letter-spacing:.04em;text-transform:uppercase;margin-top:1px;
+}
+.lp-icon{
+  position:absolute;top:50%;right:12px;
+  transform:translateY(-50%);
+  width:22px;height:22px;
+  color:#b0b8c4;pointer-events:none;
+}
+/* D0 icon is clickable */
+.lp-block.d0 .lp-icon{
+  color:#6b7280;pointer-events:all;
+  transition:color .15s;
+}
+.lp-block.d0:hover .lp-icon{color:#1a1a2e;}
+
+.lp-conn{
+  position:absolute;left:16px;width:196px;
+  display:flex;flex-direction:column;align-items:center;
+  pointer-events:none;
+}
+.lp-conn-line{width:1.5px;background:#d4d4cc;flex:1;}
+.lp-conn-arr{
+  width:0;height:0;
+  border-left:4px solid transparent;border-right:4px solid transparent;
+  border-top:5px solid #c8cdd6;margin-top:1px;
+}
+
+/* CANVAS */
+#canvas-wrap{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  overflow:hidden;cursor:grab;
+}
+#canvas-wrap.grabbing{cursor:grabbing;}
+#dot-canvas{position:absolute;top:0;left:0;pointer-events:none;}
+#world{position:absolute;top:0;left:0;transform-origin:0 0;}
+#edges-svg{position:absolute;top:0;left:0;overflow:visible;pointer-events:none;}
+
+/* PERSON CARD */
+.person-card{
+  position:absolute;width:124px;
+  background:#fff;border:1.5px solid #e8e8e2;border-radius:16px;
+  padding:12px 10px 8px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  transition:box-shadow .18s;overflow:visible;
+}
+.person-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.09);}
+
+.card-role-lbl{
+  font-size:7.5px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:#9ba3af;text-align:center;
+}
+/* CHANGE 1: initials circle — greyscale only */
+.card-circle{
+  width:48px;height:48px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:700;
+  background:#e8e8e8;color:#6b7280;
+  margin:3px 0;flex-shrink:0;
+}
+.card-name{
+  font-size:11.5px;font-weight:600;color:#1a1a2e;
+  text-align:center;width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:0 4px;
+}
+/* ✕ — red circle top-right outside card */
+.card-x{
+  position:absolute;top:-9px;right:-9px;
+  width:22px;height:22px;border-radius:50%;
+  background:#fff;border:1.5px solid #f0b0b0;
+  color:#e05050;font-size:11px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  line-height:1;z-index:20;transition:background .15s;
+}
+.card-x:hover{background:#fef2f2;}
+/* + — dark navy circle hanging below card */
+.card-plus{
+  position:absolute;
+  bottom:-14px;left:50%;transform:translateX(-50%);
+  width:28px;height:28px;border-radius:50%;
+  background:#1a1a2e;color:#fff;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:300;line-height:1;
+  box-shadow:0 2px 8px rgba(26,26,46,.28);
+  transition:background .15s;z-index:15;
+}
+.card-plus:hover{background:#2d2d4e;}
+
+/* PICKER */
+.picker{
+  position:fixed;background:#fff;
+  border:1.5px solid #e8e8e2;border-radius:14px;
+  padding:16px;width:220px;
+  box-shadow:0 8px 32px rgba(0,0,0,.13);
+  z-index:500;display:flex;flex-direction:column;gap:12px;
+}
+.pk-h{font-size:12px;font-weight:700;color:#1a1a2e;}
+.pk-f{display:flex;flex-direction:column;gap:5px;}
+.pk-lbl{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#9ba3af;}
+.pk-sel{
+  width:100%;padding:8px 28px 8px 10px;
+  border:1.5px solid #e8e8e2;border-radius:9px;
+  font-size:12px;color:#1a1a2e;background:#fff;
+  cursor:pointer;outline:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%239ba3af' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+}
+.pk-sel:focus{border-color:#1a1a2e;}
+.pk-sel:disabled{
+  background-color:#f8f8f6;color:#b8bec8;cursor:not-allowed;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23d4d8e0' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+.pk-acts{display:flex;gap:8px;justify-content:flex-end;}
+.pk-can{padding:7px 13px;border:1.5px solid #e8e8e2;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;color:#6b7280;}
+.pk-can:hover{background:#f9f9f7;}
+.pk-ok{padding:7px 14px;border:none;border-radius:8px;background:#1a1a2e;color:#fff;font-size:12px;font-weight:600;cursor:pointer;}
+.pk-ok:hover{background:#2d2d4e;}
+
+/* SKIP HOVER ZONES */
+.skip-zone{
+  position:absolute;width:34px;height:34px;
+  transform:translate(-50%,-50%);
+  z-index:80;pointer-events:all;
+  display:flex;align-items:center;justify-content:center;
+}
+.skip-btn{
+  width:22px;height:22px;border-radius:50%;
+  background:#fff;border:1.5px solid #c8cdd6;
+  color:#8a94a0;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;opacity:0;transition:all .18s;line-height:1;
+}
+.skip-zone:hover .skip-btn{opacity:1;background:#1a1a2e;color:#fff;border-color:#1a1a2e;}
+
+/* TOAST */
+#toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(70px);
+  background:#1a1a2e;color:#fff;padding:9px 18px;
+  border-radius:10px;font-size:12px;font-weight:500;
+  z-index:600;transition:transform .25s;pointer-events:none;
+}
+#toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="nav-label">
+    <div class="mode">NAV MODE</div>
+    <div class="type">Pan &amp; Zoom</div>
+  </div>
+  <button id="save-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+    Save
+  </button>
+</div>
+
+<div id="left-panel"></div>
+
+<div id="canvas-wrap">
+  <canvas id="dot-canvas"></canvas>
+  <div id="world">
+    <svg id="edges-svg"></svg>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// Role Associate = D3, Role Analyst = D4 (deepest)
+// ═══════════════════════════════════════════
+const DEPTHS=[
+  {name:'Role Admin',      label:'Depth 0'},
+  {name:'Role Manager',    label:'Depth 1'},
+  {name:'Role Supervisor', label:'Depth 2'},
+  {name:'Role Associate',  label:'Depth 3'},
+  {name:'Role Analyst',    label:'Depth 4'},
+];
+const MAX_D=DEPTHS.length-1;
+
+const CARD_W=124;
+const CARD_H=128;
+const PLUS_HANG=14; // + circle center below card bottom
+const DEPTH_H=200;  // vertical spacing between depth rows
+const CARD_TOP=60;  // world Y of top edge of D0 cards
+const TREE_GAP=80;
+const BRANCH_GAP=54;
+
+// ═══════════════════════════════════════════
+// PERSONS POOL
+// ═══════════════════════════════════════════
+const PERSONS=[
+  {id:'p01',name:'Prashant Sharma',depth:0},
+  {id:'p02',name:'Juan Fyscal',    depth:0},
+  {id:'p03',name:'Lalit Mehra',    depth:0},
+  {id:'p04',name:'Anjali Rao',     depth:0},
+  {id:'p11',name:'Hemanth Test',   depth:1},
+  {id:'p12',name:'Hritik Verma',   depth:1},
+  {id:'p13',name:'Suyash Gupta',   depth:1},
+  {id:'p14',name:'Meera Nair',     depth:1},
+  {id:'p21',name:'Rahul Bansal',   depth:2},
+  {id:'p22',name:'Abhinav Singh',  depth:2},
+  {id:'p23',name:'Priya Malhotra', depth:2},
+  {id:'p24',name:'Suresh Kumar',   depth:2},
+  {id:'p31',name:'Kanishk Dubey',  depth:3},
+  {id:'p32',name:'Suyash Patel',   depth:3},
+  {id:'p33',name:'Utkarsh Joshi',  depth:3},
+  {id:'p34',name:'Neha Sharma',    depth:3},
+  {id:'p41',name:'Arun Mehta',     depth:4},
+  {id:'p42',name:'Divya Kapoor',   depth:4},
+  {id:'p43',name:'Ravi Tiwari',    depth:4},
+  {id:'p44',name:'Pooja Verma',    depth:4},
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let nodes=[], nid=1, assigned=new Set();
+let panX=250, panY=70, scale=1;
+let panning=false, px0,py0,ppx,ppy;
+let picker=null;
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+const pers  = id => PERSONS.find(p=>p.id===id);
+const node  = id => nodes.find(n=>n.id===id);
+const kids  = id => nodes.filter(n=>n.parentId===id);
+const roots = ()  => nodes.filter(n=>n.parentId===null);
+const avail = d  => PERSONS.filter(p=>p.depth===d && !assigned.has(p.id));
+const ini   = n  => n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+const trunc = (s,m=13) => s.length>m ? s.slice(0,m)+'…' : s;
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2100);
+}
+
+// person-group SVG icon (plain — for non-D0 blocks)
+function makePersonIcon(w,h,color){
+  const s=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('width',w); s.setAttribute('height',h);
+  s.setAttribute('viewBox','0 0 24 24'); s.setAttribute('fill','none');
+  s.setAttribute('stroke',color); s.setAttribute('stroke-width','1.6');
+  s.setAttribute('stroke-linecap','round'); s.setAttribute('stroke-linejoin','round');
+  s.innerHTML=
+    '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>'+
+    '<circle cx="9" cy="7" r="4"/>'+
+    '<path d="M23 21v-2a4 4 0 00-3-3.87"/>'+
+    '<path d="M16 3.13a4 4 0 010 7.75"/>';
+  return s;
+}
+
+// person-group + plus icon (for D0 block — "add person" combined icon)
+function makePersonPlusIcon(w,h,color){
+  const s=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('width',w); s.setAttribute('height',h);
+  s.setAttribute('viewBox','0 0 24 24'); s.setAttribute('fill','none');
+  s.setAttribute('stroke',color); s.setAttribute('stroke-width','1.6');
+  s.setAttribute('stroke-linecap','round'); s.setAttribute('stroke-linejoin','round');
+  // person-add icon: single person silhouette + plus sign on right
+  s.innerHTML=
+    '<path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z"/>'+
+    '<path d="M8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3z"/>'+
+    '<path d="M8 14c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>'+
+    '<path d="M18 14v6M21 17h-6"/>';
+  return s;
+}
+
+// ═══════════════════════════════════════════
+// DOT GRID
+// ═══════════════════════════════════════════
+function drawGrid(){
+  const c=document.getElementById('dot-canvas'), ctx=c.getContext('2d');
+  c.width=window.innerWidth; c.height=window.innerHeight;
+  ctx.clearRect(0,0,c.width,c.height);
+  const sp=22; ctx.fillStyle='#d2d2ca';
+  for(let x=0;x<c.width+sp;x+=sp)
+    for(let y=0;y<c.height+sp;y+=sp){
+      ctx.beginPath(); ctx.arc(x,y,1.1,0,Math.PI*2); ctx.fill();
+    }
+}
+window.addEventListener('resize',()=>{drawGrid();syncLP();});
+drawGrid();
+
+// ═══════════════════════════════════════════
+// PAN / ZOOM
+// ═══════════════════════════════════════════
+function applyT(){
+  document.getElementById('world').style.transform=
+    `translate(${panX}px,${panY}px) scale(${scale})`;
+  syncLP();
+}
+
+const cw=document.getElementById('canvas-wrap');
+cw.addEventListener('mousedown',e=>{
+  if(e.target!==cw &&
+     e.target!==document.getElementById('dot-canvas') &&
+     e.target!==document.getElementById('edges-svg')) return;
+  panning=true; px0=e.clientX; py0=e.clientY; ppx=panX; ppy=panY;
+  cw.classList.add('grabbing');
+});
+window.addEventListener('mousemove',e=>{
+  if(!panning) return;
+  panX=ppx+(e.clientX-px0); panY=ppy+(e.clientY-py0); applyT();
+});
+window.addEventListener('mouseup',()=>{panning=false; cw.classList.remove('grabbing');});
+cw.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=cw.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const d=e.deltaY<0?1.08:0.93;
+  const ns=Math.max(0.12,Math.min(4,scale*d));
+  panX=mx-(mx-panX)*(ns/scale);
+  panY=my-(my-panY)*(ns/scale);
+  scale=ns; applyT();
+},{passive:false});
+
+// ═══════════════════════════════════════════
+// LEFT PANEL
+// CHANGE 2: D0 block person-group icon IS the clickable trigger
+// All blocks show same person-group icon top-right
+// Only D0 block is clickable (opens root picker)
+// ═══════════════════════════════════════════
+function syncLP(){
+  const panel=document.getElementById('left-panel');
+  panel.innerHTML='';
+
+  for(let d=0;d<=MAX_D;d++){
+    const worldCY = CARD_TOP + d*DEPTH_H + CARD_H/2;
+    const screenCY = panY + worldCY*scale;
+    const blockH = Math.max(46, CARD_H*scale);
+    const blockW = 196;
+    const cs = Math.min(1, Math.max(0.5, scale)); // content scale
+
+    const blk=document.createElement('div');
+    blk.className='lp-block'+(d===0?' d0':'');
+    blk.style.top=(screenCY-blockH/2)+'px';
+    blk.style.height=blockH+'px';
+    blk.style.width=blockW+'px';
+
+    // role pill
+    const pill=document.createElement('div');
+    pill.className='lp-pill';
+    pill.textContent=DEPTHS[d].name;
+    pill.style.fontSize=Math.max(7,cs*9)+'px';
+    pill.style.padding=Math.max(1,cs*2)+'px '+Math.max(4,cs*8)+'px';
+    blk.appendChild(pill);
+
+    // depth label
+    if(blockH>50){
+      const lbl=document.createElement('div');
+      lbl.className='lp-depth';
+      lbl.textContent=DEPTHS[d].label;
+      lbl.style.fontSize=Math.max(6,cs*9.5)+'px';
+      blk.appendChild(lbl);
+    }
+
+    // icon — D0 gets person+plus icon (clickable), others get plain person icon
+    const icoSz=Math.max(14,cs*22);
+    const icoColor=d===0?'#6b7280':'#b0b8c4';
+    const icoWrap=document.createElement('div');
+    icoWrap.className='lp-icon';
+    icoWrap.style.width=icoSz+'px';
+    icoWrap.style.height=icoSz+'px';
+    icoWrap.style.right=Math.max(6,cs*12)+'px';
+    const iconEl = d===0
+      ? makePersonPlusIcon(icoSz,icoSz,icoColor)
+      : makePersonIcon(icoSz,icoSz,icoColor);
+    icoWrap.appendChild(iconEl);
+    blk.appendChild(icoWrap);
+
+    // D0 click handler on the whole block
+    if(d===0){
+      blk.addEventListener('click',e=>{
+        e.stopPropagation();
+        openRootPicker(blk);
+      });
+    }
+
+    panel.appendChild(blk);
+
+    // connector to next block
+    if(d<MAX_D){
+      const nextWCY=CARD_TOP+(d+1)*DEPTH_H+CARD_H/2;
+      const nextSCY=panY+nextWCY*scale;
+      const gapTop=screenCY+blockH/2;
+      const gapH=nextSCY-blockH/2-gapTop;
+      if(gapH>6){
+        const conn=document.createElement('div');
+        conn.className='lp-conn';
+        conn.style.top=gapTop+'px';
+        conn.style.height=gapH+'px';
+        conn.style.left='16px';
+        conn.style.width=blockW+'px';
+        const ln=document.createElement('div');
+        ln.className='lp-conn-line';
+        ln.style.height=Math.max(0,gapH-7)+'px';
+        const arr=document.createElement('div');
+        arr.className='lp-conn-arr';
+        conn.appendChild(ln); conn.appendChild(arr);
+        panel.appendChild(conn);
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// LAYOUT — pure data, no DOM
+// ═══════════════════════════════════════════
+function subW(id){
+  const ch=kids(id);
+  if(!ch.length) return CARD_W;
+  return ch.reduce((s,c)=>s+subW(c.id),0)+(ch.length-1)*BRANCH_GAP;
+}
+function layoutTree(id,sx){
+  const n=node(id), ch=kids(id), tw=subW(id);
+  n.x=sx+tw/2-CARD_W/2;
+  n.y=CARD_TOP+n.depth*DEPTH_H;
+  let cx=sx;
+  for(const c of ch){
+    const cw2=subW(c.id);
+    layoutTree(c.id,cx);
+    cx+=cw2+BRANCH_GAP;
+  }
+}
+function layoutAll(){
+  let x=20;
+  for(const r of roots()){
+    const w=subW(r.id);
+    layoutTree(r.id,x);
+    x+=w+TREE_GAP;
+  }
+}
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+function render(){
+  layoutAll();
+  renderCards();
+  renderEdges();
+  syncLP();
+}
+
+function renderCards(){
+  document.getElementById('world').querySelectorAll('.person-card').forEach(e=>e.remove());
+
+  for(const n of nodes){
+    const p=pers(n.personId);
+    const isRoot=n.parentId===null;
+    const isMaxD=n.depth===MAX_D;
+    const ch=kids(n.id);
+
+    // CHANGE 4: D0 removal — only blocked if it HAS children
+    // If no children → ✕ shown regardless of how many D0s exist
+    const showX = isRoot ? ch.length===0 : true;
+
+    const card=document.createElement('div');
+    card.className='person-card';
+    card.style.left=n.x+'px';
+    card.style.top=n.y+'px';
+    card.dataset.nid=n.id;
+
+    // ✕ remove
+    if(showX){
+      const xb=document.createElement('button');
+      xb.className='card-x'; xb.textContent='✕';
+      xb.addEventListener('click',e=>{e.stopPropagation();removeNode(n.id);});
+      card.appendChild(xb);
+    }
+
+    // role label
+    const rl=document.createElement('div');
+    rl.className='card-role-lbl';
+    rl.textContent=DEPTHS[n.depth].name;
+    card.appendChild(rl);
+
+    // CHANGE 1: greyscale initials circle
+    const ci=document.createElement('div');
+    ci.className='card-circle';
+    ci.textContent=ini(p.name);
+    card.appendChild(ci);
+
+    // name
+    const nm=document.createElement('div');
+    nm.className='card-name';
+    nm.textContent=trunc(p.name);
+    nm.title=p.name;
+    card.appendChild(nm);
+
+    // + button (hidden on max depth)
+    if(!isMaxD){
+      const ab=document.createElement('button');
+      ab.className='card-plus'; ab.textContent='+';
+      ab.addEventListener('click',e=>{e.stopPropagation();openCardPicker(n.id,ab);});
+      card.appendChild(ab);
+    }
+
+    document.getElementById('world').appendChild(card);
+    n.el=card;
+  }
+}
+
+// ═══════════════════════════════════════════
+// EDGES + SKIP HOVERS
+// Connector line starts from bottom of + button
+// (card bottom + PLUS_HANG = center of + circle)
+// ═══════════════════════════════════════════
+function renderEdges(){
+  document.getElementById('edges-svg').innerHTML='';
+  document.getElementById('world').querySelectorAll('.skip-zone').forEach(e=>e.remove());
+
+  for(const n of nodes){
+    const ch=kids(n.id);
+    if(!ch.length) continue;
+
+    // line originates from center of + button (below card)
+    const px=n.x+CARD_W/2;
+    const py=n.y+CARD_H+PLUS_HANG;
+
+    if(ch.length===1){
+      const c=ch[0];
+      const cx=c.x+CARD_W/2, cy=c.y;
+      svgLine(px,py,cx,cy);
+      addSkips(px,py,cx,cy,n.depth,c.depth,n.id);
+    } else {
+      const sorted=[...ch].sort((a,b)=>a.x-b.x);
+      const lx=sorted[0].x+CARD_W/2;
+      const rx=sorted[sorted.length-1].x+CARD_W/2;
+      const minCY=Math.min(...ch.map(c=>c.y));
+      // bracket Y: 40% down between parent+ and first child top
+      const bY=py+(minCY-py)*0.4;
+
+      // vertical from parent+ down to bracket
+      svgLine(px,py,px,bY);
+      // horizontal bracket line
+      svgLine(lx,bY,rx,bY);
+      // vertical from bracket down to each child
+      for(const c of sorted){
+        const cx=c.x+CARD_W/2;
+        svgLine(cx,bY,cx,c.y);
+        // skips: depth between parent and child
+        addSkips(cx,bY,cx,c.y,n.depth,c.depth,n.id);
+      }
+    }
+  }
+}
+
+function svgLine(x1,y1,x2,y2){
+  const svg=document.getElementById('edges-svg');
+  const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+  l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+  l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+  l.setAttribute('stroke','#c8cdd6'); l.setAttribute('stroke-width','1.5');
+  svg.appendChild(l);
+}
+
+function addSkips(x1,y1,x2,y2,pD,cD,parentNId){
+  for(let d=pD+1;d<cD;d++){
+    // Y center of this depth row in world space
+    const rowY=CARD_TOP+d*DEPTH_H+CARD_H/2;
+    // interpolate X along the line at this Y
+    const totalY=y2-y1;
+    const t=totalY===0?0.5:(rowY-y1)/totalY;
+    if(t<0||t>1) continue; // row not between these two points
+    const hx=x1+(x2-x1)*t;
+
+    const zone=document.createElement('div');
+    zone.className='skip-zone';
+    zone.style.left=hx+'px';
+    zone.style.top=rowY+'px';
+
+    const btn=document.createElement('div');
+    btn.className='skip-btn'; btn.textContent='+';
+    btn.title=`Insert ${DEPTHS[d].name}`;
+    zone.appendChild(btn);
+
+    zone.addEventListener('click',e=>{
+      e.stopPropagation();
+      openHoverPicker(parentNId,d,zone);
+    });
+    document.getElementById('world').appendChild(zone);
+  }
+}
+
+// ═══════════════════════════════════════════
+// NODE OPERATIONS
+// CHANGE 3: Generic reconnection logic
+// ═══════════════════════════════════════════
+
+function createRoot(pid){
+  const id='n'+(nid++);
+  nodes.push({id,personId:pid,depth:0,parentId:null,x:0,y:0,el:null});
+  assigned.add(pid);
+  render();
+  toast(`Tree created — ${pers(pid).name}`);
+}
+
+function addNodeBelow(parentId,targetDepth,pid){
+  const id='n'+(nid++);
+  nodes.push({id,personId:pid,depth:targetDepth,parentId,x:0,y:0,el:null});
+  assigned.add(pid);
+  render();
+  toast(`${pers(pid).name} added`);
+}
+
+function insertAtDepth(parentId,depth,pid){
+  // All direct children of parent that are deeper than insertion depth
+  // get reparented to the new node
+  const toMove=kids(parentId).filter(c=>c.depth>depth);
+  const id='n'+(nid++);
+  nodes.push({id,personId:pid,depth,parentId,x:0,y:0,el:null});
+  assigned.add(pid);
+  toMove.forEach(c=>c.parentId=id);
+  render();
+  toast(`${pers(pid).name} inserted at ${DEPTHS[depth].name}`);
+}
+
+// CHANGE 3: Reconnection — generic for any tree state
+// When node X removed:
+//   1. Find X's direct children
+//   2. Reparent ALL of them to X's parent
+//   3. Grandchildren etc stay attached to their own parents (untouched)
+//   4. Full layout + edge redraw from scratch
+//   5. Skip hover ⊕ recalculates on every new edge segment automatically
+function removeNode(id){
+  const n=node(id);
+  if(!n) return;
+
+  // reparent direct children to n's parent
+  kids(id).forEach(c=>{
+    c.parentId=n.parentId;
+  });
+
+  // unassign person — back to available pool
+  assigned.delete(n.personId);
+
+  // remove node
+  nodes=nodes.filter(x=>x.id!==id);
+
+  // full redraw — layout + edges + skips all recalculate from scratch
+  render();
+  toast('Removed');
+}
+
+// ═══════════════════════════════════════════
+// PICKERS
+// ═══════════════════════════════════════════
+
+// Card ⊕ — both dropdowns visible at once, stacked
+function openCardPicker(nId,anchor){
+  closePicker();
+  const n=node(nId);
+  const pop=makePop();
+
+  addH(pop,'Add below');
+
+  // Role dropdown
+  const f1=addF(pop,'Select Role');
+  const rSel=makeSel();
+  rSel.innerHTML='<option value="">— choose role —</option>';
+  for(let d=n.depth+1;d<=MAX_D;d++){
+    const o=document.createElement('option');
+    o.value=d; o.textContent=DEPTHS[d].name;
+    rSel.appendChild(o);
+  }
+  f1.appendChild(rSel);
+
+  // Person dropdown — disabled until role chosen
+  const f2=addF(pop,'Select Person');
+  const pSel=makeSel(); pSel.disabled=true;
+  pSel.innerHTML='<option value="">— select role first —</option>';
+  f2.appendChild(pSel);
+
+  rSel.addEventListener('change',()=>{
+    const d=parseInt(rSel.value);
+    if(isNaN(d)){
+      pSel.disabled=true;
+      pSel.innerHTML='<option value="">— select role first —</option>';
+      return;
+    }
+    const av=avail(d);
+    pSel.innerHTML='<option value="">— choose person —</option>';
+    if(!av.length){
+      pSel.innerHTML='<option disabled>No persons available</option>';
+      pSel.disabled=true;
+      return;
+    }
+    av.forEach(p=>{
+      const o=document.createElement('option');
+      o.value=p.id; o.textContent=p.name;
+      pSel.appendChild(o);
+    });
+    pSel.disabled=false;
+  });
+
+  addActs(pop,
+    ()=>closePicker(),
+    ()=>{
+      const d=parseInt(rSel.value), pid=pSel.value;
+      if(isNaN(d)||!pid){toast('Select both role and person');return;}
+      addNodeBelow(nId,d,pid);
+      closePicker();
+    },'Add'
+  );
+
+  place(anchor,pop);
+  picker=pop;
+}
+
+// Hover ⊕ — depth known, person only
+function openHoverPicker(parentNId,depth,anchor){
+  closePicker();
+  const av=avail(depth);
+  const pop=makePop();
+
+  addH(pop,`Insert ${DEPTHS[depth].name}`);
+  const f=addF(pop,'Select Person');
+  const pSel=makeSel();
+  pSel.innerHTML='<option value="">— choose person —</option>';
+  if(!av.length) pSel.innerHTML='<option disabled>No persons available</option>';
+  av.forEach(p=>{
+    const o=document.createElement('option');
+    o.value=p.id; o.textContent=p.name;
+    pSel.appendChild(o);
+  });
+  f.appendChild(pSel);
+
+  addActs(pop,
+    ()=>closePicker(),
+    ()=>{
+      const pid=pSel.value;
+      if(!pid){toast('Select a person');return;}
+      insertAtDepth(parentNId,depth,pid);
+      closePicker();
+    },'Insert'
+  );
+
+  place(anchor,pop);
+  picker=pop;
+}
+
+// Root picker — D0 person only
+function openRootPicker(anchor){
+  closePicker();
+  const av=avail(0);
+  const pop=makePop();
+
+  addH(pop,'New Tree — Role Admin');
+  const f=addF(pop,'Select Person');
+  const pSel=makeSel();
+  pSel.innerHTML='<option value="">— choose person —</option>';
+  if(!av.length) pSel.innerHTML='<option disabled>No persons available</option>';
+  av.forEach(p=>{
+    const o=document.createElement('option');
+    o.value=p.id; o.textContent=p.name;
+    pSel.appendChild(o);
+  });
+  f.appendChild(pSel);
+
+  addActs(pop,
+    ()=>closePicker(),
+    ()=>{
+      const pid=pSel.value;
+      if(!pid){toast('Select a person');return;}
+      createRoot(pid);
+      closePicker();
+    },'Create Tree'
+  );
+
+  place(anchor,pop);
+  picker=pop;
+}
+
+// picker DOM helpers
+function makePop(){
+  const p=document.createElement('div');
+  p.className='picker';
+  document.body.appendChild(p);
+  return p;
+}
+function addH(pop,t){
+  const h=document.createElement('div');
+  h.className='pk-h'; h.textContent=t;
+  pop.appendChild(h); return h;
+}
+function addF(pop,label){
+  const f=document.createElement('div');
+  f.className='pk-f';
+  const l=document.createElement('div');
+  l.className='pk-lbl'; l.textContent=label;
+  f.appendChild(l);
+  pop.appendChild(f);
+  return f;
+}
+function makeSel(){
+  const s=document.createElement('select');
+  s.className='pk-sel';
+  return s;
+}
+function addActs(pop,onC,onOk,okLbl){
+  const d=document.createElement('div');
+  d.className='pk-acts';
+  const c=document.createElement('button');
+  c.className='pk-can'; c.textContent='Cancel';
+  c.addEventListener('click',onC);
+  const o=document.createElement('button');
+  o.className='pk-ok'; o.textContent=okLbl;
+  o.addEventListener('click',onOk);
+  d.appendChild(c); d.appendChild(o);
+  pop.appendChild(d);
+}
+function place(anchor,pop){
+  const r=anchor.getBoundingClientRect();
+  let top=r.bottom+8, left=r.left;
+  if(left+230>window.innerWidth) left=window.innerWidth-238;
+  if(top+290>window.innerHeight) top=r.top-300;
+  pop.style.top=top+'px';
+  pop.style.left=left+'px';
+}
+function closePicker(){
+  if(picker){picker.remove();picker=null;}
+}
+document.addEventListener('mousedown',e=>{
+  if(picker&&!picker.contains(e.target)) closePicker();
+});
+
+// ═══════════════════════════════════════════
+// SAVE / RESTORE
+// ═══════════════════════════════════════════
+document.getElementById('save-btn').addEventListener('click',()=>{
+  const s={
+    nodes:nodes.map(n=>({...n,el:null})),
+    assigned:[...assigned],
+    nid
+  };
+  localStorage.setItem('hb5',JSON.stringify(s));
+  toast('Saved ✓');
+});
+
+function restoreState(){
+  try{
+    const raw=localStorage.getItem('hb5');
+    if(!raw) return false;
+    const s=JSON.parse(raw);
+    nodes=s.nodes.map(n=>({...n,el:null}));
+    assigned=new Set(s.assigned);
+    nid=s.nid||nodes.length+1;
+    return true;
+  }catch(e){return false;}
+}
+
+// ═══════════════════════════════════════════
+// DEMO DATA
+// 3 trees covering all spec cases:
+// Tree 1: branching at D1, full chain to D3
+// Tree 2: isolated D0 root (✕ shown since it has no children)
+// Tree 3: D0→D2 skip (hover ⊕ at D1), D2→D3 bracket
+// ═══════════════════════════════════════════
+function seedDemo(){
+  // Tree 1: Prashant(D0) → Hemanth+Hritik(D1)
+  //         Hemanth(D1) → Rahul(D2) → Kanishk(D3)
+  const r1='n'+(nid++);
+  nodes.push({id:r1,personId:'p01',depth:0,parentId:null,x:0,y:0,el:null});
+  assigned.add('p01');
+  const c1='n'+(nid++);
+  nodes.push({id:c1,personId:'p11',depth:1,parentId:r1,x:0,y:0,el:null});
+  assigned.add('p11');
+  const c2='n'+(nid++);
+  nodes.push({id:c2,personId:'p12',depth:1,parentId:r1,x:0,y:0,el:null});
+  assigned.add('p12');
+  const c3='n'+(nid++);
+  nodes.push({id:c3,personId:'p21',depth:2,parentId:c1,x:0,y:0,el:null});
+  assigned.add('p21');
+  const c4='n'+(nid++);
+  nodes.push({id:c4,personId:'p31',depth:3,parentId:c3,x:0,y:0,el:null});
+  assigned.add('p31');
+
+  // Tree 2: Juan alone (D0, no children → ✕ shown)
+  const r2='n'+(nid++);
+  nodes.push({id:r2,personId:'p02',depth:0,parentId:null,x:0,y:0,el:null});
+  assigned.add('p02');
+
+  // Tree 3: Lalit(D0) → Abhinav(D2) [D1 skipped → hover ⊕]
+  //         Abhinav(D2) → Suyash+Utkarsh(D3) [bracket]
+  const r3='n'+(nid++);
+  nodes.push({id:r3,personId:'p03',depth:0,parentId:null,x:0,y:0,el:null});
+  assigned.add('p03');
+  const c5='n'+(nid++);
+  nodes.push({id:c5,personId:'p22',depth:2,parentId:r3,x:0,y:0,el:null});
+  assigned.add('p22');
+  const c6='n'+(nid++);
+  nodes.push({id:c6,personId:'p32',depth:3,parentId:c5,x:0,y:0,el:null});
+  assigned.add('p32');
+  const c7='n'+(nid++);
+  nodes.push({id:c7,personId:'p33',depth:3,parentId:c5,x:0,y:0,el:null});
+  assigned.add('p33');
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+if(!restoreState()) seedDemo();
+render();
+applyT();
+</script>
+</body>
+</html>
